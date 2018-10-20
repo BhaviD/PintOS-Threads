@@ -149,8 +149,6 @@ thread_tick (int64_t sys_ticks)
        e = list_remove (e)) 
   {
     struct thread *th = list_entry (e, struct thread, blocked_elem);
-    if(th == &idle_thread)
-      break;
     if(sys_ticks < th->reschedule_time)
       break;
     thread_unblock(th);
@@ -351,8 +349,8 @@ static bool
 resched_time_less (const struct list_elem *a_, const struct list_elem *b_,
                    void *aux UNUSED) 
 {
-  const struct thread *a = list_entry (a_, struct thread, elem);
-  const struct thread *b = list_entry (b_, struct thread, elem);
+  const struct thread *a = list_entry (a_, struct thread, blocked_elem);
+  const struct thread *b = list_entry (b_, struct thread, blocked_elem);
 
   return a->reschedule_time < b->reschedule_time;
 }
@@ -367,12 +365,11 @@ thread_sleep(int64_t resched_tm)
   ASSERT(!intr_context());
 
   old_level = intr_disable();
-  //if(cur != idle_thread)
-  //{
-    cur->reschedule_time = resched_tm;
-    list_insert_ordered(&blocked_list, &cur->blocked_elem, resched_time_less, NULL);
-    thread_block();
-  //}
+
+  cur->reschedule_time = resched_tm;
+  list_insert_ordered(&blocked_list, &cur->blocked_elem, resched_time_less, NULL);
+  thread_block();
+
   intr_set_level (old_level);
 }
 

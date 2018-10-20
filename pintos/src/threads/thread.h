@@ -94,6 +94,7 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
+    /* For blocked list */
     struct list_elem blocked_elem;      /* List element. */
 
 #ifdef USERPROG
