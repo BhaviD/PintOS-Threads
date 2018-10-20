@@ -23,6 +23,7 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
+static struct list blocked_list;
 
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
@@ -71,6 +72,12 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
+
+static bool resched_time_less (const struct list_elem *a_,
+                               const struct list_elem *b_,
+                               void *aux UNUSED);
+
+
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -91,6 +98,7 @@ thread_init (void)
 
   lock_init (&tid_lock);
   list_init (&ready_list);
+  list_init (&blocked_list);
   list_init (&all_list);
 
   /* Set up a thread structure for the running thread. */
@@ -120,7 +128,8 @@ thread_start (void)
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
 void
-thread_tick (void) 
+//thread_tick (void) 
+thread_tick (int64_t sys_ticks) 
 {
   struct thread *t = thread_current ();
 
@@ -133,6 +142,19 @@ thread_tick (void)
 #endif
   else
     kernel_ticks++;
+
+  struct list_elem* e;
+  for (e = list_begin (&blocked_list);
+       e != list_end (&blocked_list);
+       e = list_remove (e)) 
+  {
+    struct thread *th = list_entry (e, struct thread, blocked_elem);
+    if(th == &idle_thread)
+      break;
+    if(sys_ticks < th->reschedule_time)
+      break;
+    thread_unblock(th);
+  }
 
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
@@ -319,6 +341,38 @@ thread_yield (void)
     list_push_back (&ready_list, &cur->elem);
   cur->status = THREAD_READY;
   schedule ();
+  intr_set_level (old_level);
+}
+
+
+/* Returns true if value A is less than value B, false
+   otherwise. */
+static bool
+resched_time_less (const struct list_elem *a_, const struct list_elem *b_,
+                   void *aux UNUSED) 
+{
+  const struct thread *a = list_entry (a_, struct thread, elem);
+  const struct thread *b = list_entry (b_, struct thread, elem);
+
+  return a->reschedule_time < b->reschedule_time;
+}
+
+
+void
+thread_sleep(int64_t resched_tm)
+{
+  struct thread* cur = thread_current();
+  enum intr_level old_level;
+
+  ASSERT(!intr_context());
+
+  old_level = intr_disable();
+  //if(cur != idle_thread)
+  //{
+    cur->reschedule_time = resched_tm;
+    list_insert_ordered(&blocked_list, &cur->blocked_elem, resched_time_less, NULL);
+    thread_block();
+  //}
   intr_set_level (old_level);
 }
 
