@@ -359,7 +359,7 @@ sub cyl_sectors {
 # Makes sure that the loader is a reasonable size.
 sub read_loader {
     my ($name) = @_;
-    $name = find_file ("loader.bin") if !defined $name;
+    $name = find_file ("/home/bhavidhingra/google-drive-iiith/Semester_#1/CSE531_OS_PG/Assignments/3/PintOS-Threads/pintos/src/threads/build/loader.bin") if !defined $name;
     die "Cannot find loader\n" if !defined $name;
 
     my ($handle);
