@@ -158,12 +158,6 @@ thread_tick (void)
     thread_unblock(temp_t);
   }
 
-  e = list_begin(&ready_list);
-  temp_t = list_entry (e, struct thread, elem);
-
-  if(temp_t->priority > t->priority)
-    intr_yield_on_return ();
-
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
@@ -275,7 +269,6 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  //list_push_back (&ready_list, &t->elem);
   list_insert_ordered(&ready_list, &t->elem, priority_greater, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
@@ -348,7 +341,6 @@ thread_yield (void)
   old_level = intr_disable ();
   if (cur != idle_thread) 
     list_insert_ordered(&ready_list, &cur->elem, priority_greater, NULL);
-    //list_push_back (&ready_list, &cur->elem);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -420,6 +412,12 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
+
+  struct list_elem* e = list_begin(&ready_list);
+  struct thread* temp_t = list_entry (e, struct thread, elem);
+
+  if(temp_t->priority > new_priority)
+    thread_yield ();
 }
 
 /* Returns the current thread's priority. */
