@@ -23,7 +23,7 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
-static struct list blocked_list;
+static struct list sleep_list;
 
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
@@ -98,7 +98,7 @@ thread_init (void)
 
   lock_init (&tid_lock);
   list_init (&ready_list);
-  list_init (&blocked_list);
+  list_init (&sleep_list);
   list_init (&all_list);
 
   /* Set up a thread structure for the running thread. */
@@ -128,10 +128,10 @@ thread_start (void)
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
 void
-//thread_tick (void) 
-thread_tick (int64_t sys_ticks) 
+thread_tick (void)
 {
   struct thread *t = thread_current ();
+  int64_t sys_ticks = timer_ticks();
 
   /* Update statistics. */
   if (t == idle_thread)
@@ -144,11 +144,11 @@ thread_tick (int64_t sys_ticks)
     kernel_ticks++;
 
   struct list_elem* e;
-  for (e = list_begin (&blocked_list);
-       e != list_end (&blocked_list);
+  for (e = list_begin (&sleep_list);
+       e != list_end (&sleep_list);
        e = list_remove (e)) 
   {
-    struct thread *th = list_entry (e, struct thread, blocked_elem);
+    struct thread *th = list_entry (e, struct thread, sleep_elem);
     if(sys_ticks < th->reschedule_time)
       break;
     thread_unblock(th);
@@ -349,8 +349,8 @@ static bool
 resched_time_less (const struct list_elem *a_, const struct list_elem *b_,
                    void *aux UNUSED) 
 {
-  const struct thread *a = list_entry (a_, struct thread, blocked_elem);
-  const struct thread *b = list_entry (b_, struct thread, blocked_elem);
+  const struct thread *a = list_entry (a_, struct thread, sleep_elem);
+  const struct thread *b = list_entry (b_, struct thread, sleep_elem);
 
   return a->reschedule_time < b->reschedule_time;
 }
@@ -367,7 +367,7 @@ thread_sleep(int64_t resched_tm)
   old_level = intr_disable();
 
   cur->reschedule_time = resched_tm;
-  list_insert_ordered(&blocked_list, &cur->blocked_elem, resched_time_less, NULL);
+  list_insert_ordered(&sleep_list, &cur->sleep_elem, resched_time_less, NULL);
   thread_block();
 
   intr_set_level (old_level);
