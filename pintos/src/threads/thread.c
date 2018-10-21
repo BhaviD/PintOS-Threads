@@ -77,6 +77,9 @@ static bool resched_time_less (const struct list_elem *a_,
                                const struct list_elem *b_,
                                void *aux UNUSED);
 
+static bool priority_greater (const struct list_elem *a_,
+                              const struct list_elem *b_,
+                              void *aux UNUSED);
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -144,15 +147,22 @@ thread_tick (void)
     kernel_ticks++;
 
   struct list_elem* e;
+  struct thread *temp_t;
   for (e = list_begin (&sleep_list);
        e != list_end (&sleep_list);
        e = list_remove (e)) 
   {
-    struct thread *th = list_entry (e, struct thread, sleep_elem);
-    if(sys_ticks < th->reschedule_time)
+    temp_t = list_entry (e, struct thread, sleep_elem);
+    if(sys_ticks < temp_t->reschedule_time)
       break;
-    thread_unblock(th);
+    thread_unblock(temp_t);
   }
+
+  e = list_begin(&ready_list);
+  temp_t = list_entry (e, struct thread, elem);
+
+  if(temp_t->priority > t->priority)
+    intr_yield_on_return ();
 
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
@@ -265,7 +275,8 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  //list_push_back (&ready_list, &t->elem);
+  list_insert_ordered(&ready_list, &t->elem, priority_greater, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -336,14 +347,15 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+    list_insert_ordered(&ready_list, &cur->elem, priority_greater, NULL);
+    //list_push_back (&ready_list, &cur->elem);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
 }
 
 
-/* Returns true if value A is less than value B, false
+/* Returns true if reschedule time of A is less than reschedule time of B, false
    otherwise. */
 static bool
 resched_time_less (const struct list_elem *a_, const struct list_elem *b_,
@@ -353,6 +365,19 @@ resched_time_less (const struct list_elem *a_, const struct list_elem *b_,
   const struct thread *b = list_entry (b_, struct thread, sleep_elem);
 
   return a->reschedule_time < b->reschedule_time;
+}
+
+
+/* Returns true if priority of A is greater than priority of B, false
+   otherwise. */
+static bool
+priority_greater (const struct list_elem *a_, const struct list_elem *b_,
+                   void *aux UNUSED) 
+{
+  const struct thread *a = list_entry (a_, struct thread, elem);
+  const struct thread *b = list_entry (b_, struct thread, elem);
+
+  return a->priority >= b->priority;
 }
 
 
