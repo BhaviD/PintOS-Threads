@@ -11,6 +11,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "devices/timer.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -225,10 +226,8 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
-  struct list_elem* e = list_begin(&ready_list);
-  struct thread* temp_t = list_entry (e, struct thread, elem);
-
-  if(temp_t->priority > thread_current()->priority)
+  int max_priority = thread_max_priority_get();
+  if(max_priority > thread_current()->priority)
     thread_yield ();
 
   return tid;
@@ -267,7 +266,8 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_insert_ordered(&ready_list, &t->elem, priority_greater, NULL);
+  list_insert_ordered(&ready_list, &t->elem, ready_priority_greater, NULL);
+
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -338,7 +338,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_insert_ordered(&ready_list, &cur->elem, priority_greater, NULL);
+    list_insert_ordered(&ready_list, &cur->elem, ready_priority_greater, NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -361,8 +361,8 @@ resched_time_less (const struct list_elem *a_, const struct list_elem *b_,
 /* Returns true if priority of A is greater than priority of B, false
    otherwise. */
 bool
-priority_greater (const struct list_elem *a_, const struct list_elem *b_,
-                   void *aux UNUSED) 
+ready_priority_greater (const struct list_elem *a_, const struct list_elem *b_,
+                        void *aux UNUSED) 
 {
   const struct thread *a = list_entry (a_, struct thread, elem);
   const struct thread *b = list_entry (b_, struct thread, elem);
@@ -370,6 +370,13 @@ priority_greater (const struct list_elem *a_, const struct list_elem *b_,
   return a->priority > b->priority;
 }
 
+int thread_max_priority_get()
+{
+  struct list_elem* e = list_begin(&ready_list);
+  struct thread* t = list_entry (e, struct thread, elem);
+
+  return t->priority;
+}
 
 void
 thread_sleep(int64_t resched_tm)

@@ -50,6 +50,20 @@ sema_init (struct semaphore *sema, unsigned value)
   list_init (&sema->waiters);
 }
 
+/* Returns true if priority of A is greater than priority of B, false
+   otherwise. */
+bool
+waiter_priority_greater (const struct list_elem *a_, const struct list_elem *b_,
+                        void *aux UNUSED)
+{
+  const struct thread *a = list_entry (a_, struct thread, wait_elem);
+  const struct thread *b = list_entry (b_, struct thread, wait_elem);
+
+  return a->priority > b->priority;
+}
+
+
+
 /* Down or "P" operation on a semaphore.  Waits for SEMA's value
    to become positive and then atomically decrements it.
 
@@ -68,7 +82,7 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
-      list_insert_ordered(&sema->waiters, &thread_current()->elem, priority_greater, NULL);
+      list_insert_ordered(&sema->waiters, &thread_current()->wait_elem, waiter_priority_greater, NULL);
       thread_block ();
     }
   sema->value--;
@@ -114,10 +128,16 @@ sema_up (struct semaphore *sema)
 
   old_level = intr_disable ();
   if (!list_empty (&sema->waiters)) 
+  {
     thread_unblock (list_entry (list_pop_front (&sema->waiters),
-                                struct thread, elem));
+                                struct thread, wait_elem));
+  }
   sema->value++;
   intr_set_level (old_level);
+
+  int max_priority = thread_max_priority_get();
+  if(max_priority > thread_current()->priority)
+    thread_yield ();
 }
 
 static void sema_test_helper (void *sema_);

@@ -97,6 +97,9 @@ struct thread
     /* For blocked list */
     struct list_elem sleep_elem;        /* List element. */
 
+    /* For waiters_list */
+    struct list_elem wait_elem;        /* List element. */
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
@@ -147,10 +150,11 @@ bool resched_time_less (const struct list_elem *a_,
                         const struct list_elem *b_,
                         void *aux UNUSED);
 
-bool priority_greater (const struct list_elem *a_,
-                       const struct list_elem *b_,
-                       void *aux UNUSED);
+bool ready_priority_greater (const struct list_elem *a_,
+                             const struct list_elem *b_,
+                             void *aux UNUSED);
 
+int thread_max_priority_get(void);
 
 
 #endif /* threads/thread.h */
