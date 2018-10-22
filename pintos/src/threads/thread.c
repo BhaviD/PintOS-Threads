@@ -73,14 +73,6 @@ void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
 
-static bool resched_time_less (const struct list_elem *a_,
-                               const struct list_elem *b_,
-                               void *aux UNUSED);
-
-static bool priority_greater (const struct list_elem *a_,
-                              const struct list_elem *b_,
-                              void *aux UNUSED);
-
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -233,6 +225,12 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
+  struct list_elem* e = list_begin(&ready_list);
+  struct thread* temp_t = list_entry (e, struct thread, elem);
+
+  if(temp_t->priority > thread_current()->priority)
+    thread_yield ();
+
   return tid;
 }
 
@@ -349,7 +347,7 @@ thread_yield (void)
 
 /* Returns true if reschedule time of A is less than reschedule time of B, false
    otherwise. */
-static bool
+bool
 resched_time_less (const struct list_elem *a_, const struct list_elem *b_,
                    void *aux UNUSED) 
 {
@@ -362,7 +360,7 @@ resched_time_less (const struct list_elem *a_, const struct list_elem *b_,
 
 /* Returns true if priority of A is greater than priority of B, false
    otherwise. */
-static bool
+bool
 priority_greater (const struct list_elem *a_, const struct list_elem *b_,
                    void *aux UNUSED) 
 {
