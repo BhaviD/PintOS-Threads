@@ -92,13 +92,13 @@ struct thread
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
-    struct list_elem elem;              /* List element. */
+    struct list_elem elem;               /* List element. */
 
     /* For blocked list */
-    struct list_elem sleep_elem;        /* List element. */
+    struct list_elem sleep_elem;         /* List element. */
 
-    /* For waiters_list */
-    struct list_elem wait_elem;        /* List element. */
+    /* For semaphore waiters_list */
+    struct list_elem sema_wait_elem;     /* List element. */
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
